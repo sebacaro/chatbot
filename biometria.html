@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validación Biométrica - Copec/Pronto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: #28a745;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .biometric-icon {
+            width: 120px;
+            height: 120px;
+            margin: 30px auto;
+            background: #f8f9fa;
+            border: 3px solid #ddd;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: #28a745;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .biometric-icon:hover {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .biometric-icon.active {
+            border-color: #28a745;
+            background: #f8fff9;
+            animation: pulse 2s infinite;
+        }
+
+        .biometric-icon.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .biometric-icon.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+            color: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4);
+            }
+            70% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
+        }
+
+        .scan-button {
+            width: 100%;
+            padding: 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .scan-button:hover {
+            background: #218838;
+        }
+
+        .scan-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .alternative-method {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
+
+        .alternative-method h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .email-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            transition: border-color 0.3s ease;
+        }
+
+        .email-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .send-otp-btn {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .send-otp-btn:hover {
+            background: #0056b3;
+        }
+
+        .otp-container {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .otp-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .otp-input {
+            width: 45px;
+            height: 45px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 18px;
+            text-align: center;
+            font-weight: bold;
+            transition: border-color 0.3s ease;
+        }
+
+        .otp-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .verify-otp-btn {
+            width: 100%;
+            padding: 12px;
+            background: #fd7e14;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .verify-otp-btn:hover {
+            background: #e8630e;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #28a745;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message, .success-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .instructions {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #004085;
+        }
+
+        .device-info {
+            margin-top: 20px;
+            font-size: 11px;
+            color: #999;
+        }
+
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #856404;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            .biometric-icon {
+                width: 100px;
+                height: 100px;
+                font-size: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🔐</div>
+        <h1>Validación Biométrica</h1>
+        <p class="subtitle">Completa la autenticación biométrica para acceder a información sensible</p>
+        
+        <div class="biometric-icon" id="biometricIcon" onclick="startBiometricAuth()">
+            👆
+        </div>
+
+        <button class="scan-button" onclick="startBiometricAuth()" id="scanButton">
+            🔍 Iniciar Escáner Biométrico
+        </button>
+
+        <div class="alternative-method">
+            <h3>📧 Método Alternativo - Código OTP</h3>
+            <input type="email" class="email-input" id="emailInput" placeholder="tucorreo@copec.cl" value="">
+            <button class="send-otp-btn" onclick="sendOTP()">Enviar Código OTP</button>
+            
+            <div class="otp-container" id="otpContainer">
+                <div class="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" oninput="moveToNext(this, 0)">
+                    <input type="text" class="otp-input" maxlength="1" oninput="moveToNext(this, 1)">
+                    <input type="text" class="otp-input" maxlength="1" oninput="moveToNext(this, 2)">
+                    <input type="text" class="otp-input" maxlength="1" oninput="moveToNext(this, 3)">
+                    <input type="text" class="otp-input" maxlength="1" oninput="moveToNext(this, 4)">
+                    <input type="text" class="otp-input" maxlength="1" oninput="moveToNext(this, 5)">
+                </div>
+                <button class="verify-otp-btn" onclick="verifyOTP()">Verificar Código OTP</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Validando identidad...</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+
+        <div class="instructions">
+            <strong>📋 Instrucciones:</strong><br>
+            1. Usa tu huella dactilar, Face ID o PIN del dispositivo<br>
+            2. Si no funciona, usa el método alternativo con código OTP<br>
+            3. El código OTP llegará a tu correo corporativo
+        </div>
+
+        <div class="device-info" id="deviceInfo"></div>
+
+        <div class="security-notice">
+            <strong>🛡️ Máxima Seguridad:</strong><br>
+            Sistema de triple autenticación activo. Ubicación GPS verificada. Todos los accesos son monitoreados en tiempo real.
+        </div>
+    </div>
+
+    <script>
+        // Obtener parámetros de URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const chatId = urlParams.get('chatId');
+        const rut = urlParams.get('rut');
+        const nivel = urlParams.get('nivel');
+        const pinToken = urlParams.get('pinToken');
+
+        let isWebAuthnSupported = false;
+        let deviceInfo = '';
+
+        // Verificar soporte WebAuthn
+        window.addEventListener('load', () => {
+            checkWebAuthnSupport();
+            detectDeviceInfo();
+            preloadUserEmail();
+        });
+
+        function checkWebAuthnSupport() {
+            if (window.PublicKeyCredential) {
+                isWebAuthnSupported = true;
+                document.querySelector('.biometric-icon').style.color = '#28a745';
+            } else {
+                isWebAuthnSupported = false;
+                document.querySelector('.biometric-icon').style.color = '#dc3545';
+                document.getElementById('scanButton').disabled = true;
+                document.getElementById('scanButton').textContent = '❌ Biometría no soportada';
+                showError('Tu dispositivo no soporta autenticación biométrica. Usa el método alternativo con OTP.');
+            }
+        }
+
+        function detectDeviceInfo() {
+            deviceInfo = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            
+            document.getElementById('deviceInfo').innerHTML = `
+                Dispositivo: ${navigator.platform} | Navegador: ${navigator.userAgent.split(' ')[0]} | Zona horaria: ${deviceInfo.timezone}
+            `;
+        }
+
+        function preloadUserEmail() {
+            // Intentar cargar email desde localStorage o sugerir dominio corporativo
+            const savedEmail = localStorage.getItem('userEmail');
+            if (savedEmail) {
+                document.getElementById('emailInput').value = savedEmail;
+            }
+        }
+
+        async function startBiometricAuth() {
+            if (!isWebAuthnSupported) {
+                showError('Autenticación biométrica no disponible en este dispositivo');
+                return;
+            }
+
+            const icon = document.getElementById('biometricIcon');
+            const button = document.getElementById('scanButton');
+            
+            icon.classList.add('active');
+            button.disabled = true;
+            button.textContent = '🔍 Escaneando...';
+
+            showLoading(true);
+
+            try {
+                // Obtener credenciales de autenticación
+                const authOptions = await fetch('https://tu-webhook-n8n.com/webauthn/options', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        rut: rut,
+                        pinToken: pinToken
+                    })
+                });
+
+                const options = await authOptions.json();
+
+                if (!options.success) {
+                    throw new Error(options.message || 'Error obteniendo opciones de autenticación');
+                }
+
+                // Iniciar autenticación WebAuthn
+                const credential = await navigator.credentials.get({
+                    publicKey: options.publicKey
+                });
+
+                // Verificar credencial
+                const verifyResponse = await fetch('https://tu-webhook-n8n.com/webauthn/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        rut: rut,
+                        pinToken: pinToken,
+                        credential: credential,
+                        deviceInfo: deviceInfo,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+
+                const result = await verifyResponse.json();
+
+                if (result.success) {
+                    icon.classList.remove('active');
+                    icon.classList.add('success');
+                    icon.innerHTML = '✅';
+                    
+                    showSuccess('Autenticación biométrica exitosa');
+                    
+                    // Continuar con el flujo
+                    setTimeout(() => {
+                        window.close();
+                        window.parent.postMessage({
+                            type: 'BIOMETRIC_VALIDATED',
+                            chatId: chatId,
+                            nivel: nivel,
+                            token: result.token
+                        }, '*');
+                    }, 2000);
+                } else {
+                    throw new Error(result.message || 'Error en la verificación biométrica');
+                }
+
+            } catch (error) {
+                console.error('Error en autenticación biométrica:', error);
+                
+                icon.classList.remove('active');
+                icon.classList.add('error');
+                icon.innerHTML = '❌';
+                
+                showError('Error en la autenticación biométrica: ' + error.message);
+                
+                // Mostrar método alternativo
+                document.querySelector('.alternative-method').style.border = '2px solid #007bff';
+                document.querySelector('.alternative-method').style.background = '#f8f9ff';
+                
+            } finally {
+                showLoading(false);
+                button.disabled = false;
+                button.textContent = '🔍 Reintentar Escáner Biométrico';
+            }
+        }
+
+        async function sendOTP() {
+            const email = document.getElementById('emailInput').value.trim();
+            
+            if (!email) {
+                showError('Ingresa tu correo electrónico');
+                return;
+            }
+
+            if (!email.includes('@copec.cl') && !email.includes('@pronto.cl')) {
+                showError('Debes usar tu correo corporativo (@copec.cl o @pronto.cl)');
+                return;
+            }
+
+            showLoading(true);
+            localStorage.setItem('userEmail', email);
+
+            try {
+                const response = await fetch('https://tu-webhook-n8n.com/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        rut: rut,
+                        pinToken: pinToken,
+                        email: email,
+                        nivel: nivel
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess('Código OTP enviado a tu correo corporativo');
+                    document.getElementById('otpContainer').style.display = 'block';
+                    document.querySelector('.otp-input').focus();
+                } else {
+                    showError(result.message || 'Error enviando código OTP');
+                }
+
+            } catch (error) {
+                console.error('Error enviando OTP:', error);
+                showError('Error de conexión. Intenta nuevamente.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function verifyOTP() {
+            const otpInputs = document.querySelectorAll('.otp-input');
+            const otp = Array.from(otpInputs).map(input => input.value).join('');
+
+            if (otp.length !== 6) {
+                showError('Ingresa el código OTP completo de 6 dígitos');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const response = await fetch('https://tu-webhook-n8n.com/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        rut: rut,
+                        pinToken: pinToken,
+                        otp: otp,
+                        email: document.getElementById('emailInput').value,
+                        nivel: nivel,
+                        deviceInfo: deviceInfo
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess('Código OTP verificado correctamente');
+                    
+                    setTimeout(() => {
+                        window.close();
+                        window.parent.postMessage({
+                            type: 'OTP_VALIDATED',
+                            chatId: chatId,
+                            nivel: nivel,
+                            token: result.token
+                        }, '*');
+                    }, 2000);
+                } else {
+                    showError(result.message || 'Código OTP incorrecto');
+                    // Limpiar inputs
+                    otpInputs.forEach(input => {
+                        input.value = '';
+                        input.style.borderColor = '#dc3545';
+                    });
+                    otpInputs[0].focus();
+                }
+
+            } catch (error) {
+                console.error('Error verificando OTP:', error);
+                showError('Error de conexión. Intenta nuevamente.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function moveToNext(input, index) {
+            if (input.value.length === 1 && index < 5) {
+                document.querySelectorAll('.otp-input')[index + 1].focus();
+            }
+            
+            // Resetear color del borde
+            input.style.borderColor = '#ddd';
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            document.getElementById('successMessage').style.display = 'none';
+            
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // Prevenir copiar/pegar y click derecho
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a')) {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
