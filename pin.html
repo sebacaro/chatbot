@@ -397,7 +397,7 @@
 
             try {
                 // Validar PIN con el webhook de n8n
-                const response = await fetch('https://tu-webhook-n8n.com/validar-pin', {
+                const response = await fetch('https://tu-instancia-n8n.com/webhook/validar-pin', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
