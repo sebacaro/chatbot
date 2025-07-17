@@ -288,6 +288,7 @@
         const chatId = urlParams.get('chatId');
         const rut = urlParams.get('rut');
         const nivel = urlParams.get('nivel') || '1';
+        const token = urlParams.get('token');
 
         // Detectar ubicación para verificación GPS
         let userLocation = null;
@@ -407,6 +408,7 @@
                         rut: rut,
                         pin: currentPin,
                         nivel: nivel,
+                        token: token,
                         location: userLocation,
                         timestamp: new Date().toISOString()
                     })
