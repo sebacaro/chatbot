@@ -444,15 +444,43 @@ URL: ${window.location.href}`;
 
                 console.log('Datos a enviar:', requestData);
 
-                // Validar PIN con el webhook de n8n usando proxy CORS
-                const response = await fetch('https://cors-anywhere.herokuapp.com/https://sebacaro.app.n8n.cloud/webhook-test/validar-pin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify(requestData)
-                });
+                // Intentar múltiples métodos para conectar con n8n
+                let response;
+                let errorMessage = '';
+                
+                try {
+                    // Método 1: Directo (puede fallar por CORS)
+                    console.log('Intentando conexión directa...');
+                    response = await fetch('https://sebacaro.app.n8n.cloud/webhook-test/validar-pin', {
+                        method: 'POST',
+                        mode: 'cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+                } catch (directError) {
+                    console.log('Conexión directa falló:', directError);
+                    
+                    try {
+                        // Método 2: Con proxy alternativo
+                        console.log('Intentando con proxy allorigins...');
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://sebacaro.app.n8n.cloud/webhook-test/validar-pin')}`;
+                        response = await fetch(proxyUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(requestData)
+                        });
+                    } catch (proxyError) {
+                        console.log('Proxy falló:', proxyError);
+                        
+                        // Método 3: Simular respuesta para debug
+                        console.log('Simulando respuesta para debug...');
+                        throw new Error(`CORS Error: No se puede conectar a n8n. Errores: Direct: ${directError.message}, Proxy: ${proxyError.message}`);
+                    }
+                }
 
                 console.log('Response status:', response.status);
                 console.log('Response headers:', response.headers);
@@ -518,11 +546,41 @@ Full Response: ${JSON.stringify(result, null, 2)}`;
                 }
             } catch (error) {
                 console.error('Error validando PIN:', error);
-                showError('Error de conexión: ' + error.message);
                 
-                // Si el error es de red, mostrar más detalles
-                if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                    showError('Error de red. Verifica tu conexión y que n8n esté funcionando.');
+                // Si es error de CORS, ofrecer alternativa
+                if (error.message.includes('CORS')) {
+                    const alternativeDiv = document.createElement('div');
+                    alternativeDiv.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: #fff;
+                        padding: 20px;
+                        border-radius: 10px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                        z-index: 10000;
+                        max-width: 400px;
+                        text-align: center;
+                    `;
+                    alternativeDiv.innerHTML = `
+                        <h3>🚫 Error de CORS</h3>
+                        <p>No se puede conectar directamente a n8n desde GitHub Pages.</p>
+                        <p><strong>Soluciones:</strong></p>
+                        <ol style="text-align: left;">
+                            <li>Configura CORS en n8n con: <code>N8N_CORS_ORIGIN=*</code></li>
+                            <li>Usa un dominio propio en lugar de GitHub Pages</li>
+                            <li>Configura un proxy en tu servidor</li>
+                        </ol>
+                        <p><strong>Para testing:</strong> El PIN <code>${currentPin}</code> con token <code>${token}</code> debe validarse en el backend.</p>
+                        <button onclick="this.parentElement.remove(); simulateValidation();" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">Simular Validación ✓</button>
+                        <button onclick="this.parentElement.remove()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Cerrar ✗</button>
+                    `;
+                    document.body.appendChild(alternativeDiv);
+                    
+                    showError('Error de CORS - Ver instrucciones en pantalla');
+                } else {
+                    showError('Error de conexión: ' + error.message);
                 }
             } finally {
                 document.querySelector('.loading').style.display = 'none';
@@ -547,6 +605,29 @@ Full Response: ${JSON.stringify(result, null, 2)}`;
         document.addEventListener('selectstart', (e) => {
             e.preventDefault();
         });*/
+
+        // Función para simular validación exitosa (solo para testing)
+        function simulateValidation() {
+            console.log('=== SIMULANDO VALIDACIÓN EXITOSA ===');
+            console.log('PIN simulado:', currentPin);
+            console.log('Token simulado:', token);
+            
+            showSuccess('PIN validado correctamente (SIMULADO)');
+            
+            // Redireccionar según el nivel después de 2 segundos
+            setTimeout(() => {
+                if (nivel === '2' || nivel === '3') {
+                    // Ir a validación biométrica
+                    const biometriaUrl = `https://sebacaro.github.io/chatbot/biometria.html?chatId=${chatId}&rut=${rut}&nivel=${nivel}&pinToken=simulated-token-${Date.now()}`;
+                    console.log('Redirigiendo a biometría:', biometriaUrl);
+                    window.location.href = biometriaUrl;
+                } else {
+                    // Nivel 1: Cerrar ventana y continuar
+                    showSuccess('Validación completa - Nivel 1');
+                    console.log('Validación nivel 1 completada');
+                }
+            }, 2000);
+        }
 
         // Verificar conexión con n8n al cargar
         async function checkN8nConnection() {
