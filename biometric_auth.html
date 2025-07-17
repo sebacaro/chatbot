@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validación Biométrica - ArcoPrime</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .biometric-icon {
+            font-size: 60px;
+            margin: 30px 0;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .auth-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            min-width: 200px;
+        }
+        
+        .auth-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .auth-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .device-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .telegram-return {
+            margin-top: 30px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .telegram-code {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 16px;
+            font-weight: bold;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🔐</div>
+        <h1>Validación Biométrica</h1>
+        <p class="subtitle">Autentica tu identidad para continuar</p>
+        
+        <div id="biometric-section">
+            <div class="biometric-icon" id="biometric-icon">👆</div>
+            <button class="auth-button" id="auth-button" onclick="authenticateUser()">
+                Iniciar Autenticación
+            </button>
+            <button class="auth-button" id="fallback-button" onclick="fallbackAuth()" style="background: #6c757d; display: none;">
+                Usar PIN/Contraseña
+            </button>
+        </div>
+        
+        <div id="loader" class="loader hidden"></div>
+        
+        <div id="status" class="status hidden"></div>
+        
+        <div class="device-info" id="device-info"></div>
+        
+        <div id="telegram-return" class="telegram-return hidden">
+            <h3>✅ Autenticación Exitosa</h3>
+            <p>Copia este código y envíalo en Telegram:</p>
+            <div class="telegram-code" id="auth-code"></div>
+            <p><small>El código expira en 5 minutos</small></p>
+        </div>
+    </div>
+
+    <script>
+        class BiometricAuth {
+            constructor() {
+                this.chatId = this.getUrlParameter('chatId');
+                this.userId = this.getUrlParameter('userId');
+                this.deviceInfo = this.detectDevice();
+                this.authToken = null;
+                this.init();
+            }
+            
+            init() {
+                this.updateDeviceInfo();
+                this.checkBiometricSupport();
+            }
+            
+            getUrlParameter(name) {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get(name);
+            }
+            
+            detectDevice() {
+                const userAgent = navigator.userAgent;
+                const platform = navigator.platform;
+                
+                let device = {
+                    os: 'Unknown',
+                    biometricType: 'biométrica',
+                    isSupported: false
+                };
+                
+                if (/iPhone|iPad|iPod/.test(userAgent)) {
+                    device.os = 'iOS';
+                    device.biometricType = 'Face ID / Touch ID';
+                    device.isSupported = true;
+                } else if (/Android/.test(userAgent)) {
+                    device.os = 'Android';
+                    device.biometricType = 'Huella Digital';
+                    device.isSupported = true;
+                } else if (/Windows/.test(userAgent)) {
+                    device.os = 'Windows';
+                    device.biometricType = 'Windows Hello';
+                    device.isSupported = true;
+                } else if (/Mac/.test(platform)) {
+                    device.os = 'macOS';
+                    device.biometricType = 'Touch ID';
+                    device.isSupported = true;
+                }
+                
+                return device;
+            }
+            
+            updateDeviceInfo() {
+                const deviceInfoEl = document.getElementById('device-info');
+                deviceInfoEl.innerHTML = `
+                    <strong>Sistema:</strong> ${this.deviceInfo.os}<br>
+                    <strong>Método:</strong> ${this.deviceInfo.biometricType}<br>
+                    <strong>Chat ID:</strong> ${this.chatId || 'No especificado'}
+                `;
+            }
+            
+            checkBiometricSupport() {
+                const authButton = document.getElementById('auth-button');
+                const fallbackButton = document.getElementById('fallback-button');
+                const biometricIcon = document.getElementById('biometric-icon');
+                
+                if (!window.PublicKeyCredential) {
+                    this.showStatus('error', 'WebAuthn no soportado en este navegador');
+                    authButton.disabled = true;
+                    fallbackButton.style.display = 'inline-block';
+                    return;
+                }
+                
+                // Actualizar icono según el dispositivo
+                if (this.deviceInfo.os === 'iOS') {
+                    biometricIcon.textContent = '🆔'; // Face ID
+                } else if (this.deviceInfo.os === 'Android') {
+                    biometricIcon.textContent = '👆'; // Fingerprint
+                } else if (this.deviceInfo.os === 'Windows') {
+                    biometricIcon.textContent = '👤'; // Windows Hello
+                }
+                
+                authButton.textContent = `Autenticar con ${this.deviceInfo.biometricType}`;
+            }
+            
+            async authenticateUser() {
+                const authButton = document.getElementById('auth-button');
+                const loader = document.getElementById('loader');
+                const statusEl = document.getElementById('status');
+                
+                try {
+                    authButton.disabled = true;
+                    loader.classList.remove('hidden');
+                    statusEl.classList.add('hidden');
+                    
+                    this.showStatus('info', 'Preparando autenticación...');
+                    
+                    // Configuración WebAuthn
+                    const publicKeyCredentialRequestOptions = {
+                        challenge: this.generateChallenge(),
+                        allowCredentials: [],
+                        userVerification: 'required',
+                        authenticatorSelection: {
+                            authenticatorAttachment: 'platform',
+                            userVerification: 'required'
+                        },
+                        timeout: 60000
+                    };
+                    
+                    // Si no hay credenciales registradas, crear una nueva
+                    const hasCredentials = await this.checkExistingCredentials();
+                    
+                    if (!hasCredentials) {
+                        await this.registerNewCredential();
+                    } else {
+                        await this.authenticateWithCredential(publicKeyCredentialRequestOptions);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error de autenticación:', error);
+                    this.handleAuthError(error);
+                } finally {
+                    authButton.disabled = false;
+                    loader.classList.add('hidden');
+                }
+            }
+            
+            async checkExistingCredentials() {
+                // Verificar si existen credenciales en localStorage
+                const storedCredentials = localStorage.getItem(`biometric_cred_${this.chatId}`);
+                return !!storedCredentials;
+            }
+            
+            async registerNewCredential() {
+                this.showStatus('info', 'Registrando nueva credencial biométrica...');
+                
+                const publicKeyCredentialCreationOptions = {
+                    challenge: this.generateChallenge(),
+                    rp: {
+                        name: "ArcoPrime Chatbot",
+                        id: window.location.hostname,
+                    },
+                    user: {
+                        id: new TextEncoder().encode(this.chatId || 'user'),
+                        name: `usuario_${this.chatId}`,
+                        displayName: "Usuario ArcoPrime",
+                    },
+                    pubKeyCredParams: [{alg: -7, type: "public-key"}],
+                    authenticatorSelection: {
+                        authenticatorAttachment: "platform",
+                        userVerification: "required"
+                    },
+                    timeout: 60000,
+                    attestation: "direct"
+                };
+                
+                const credential = await navigator.credentials.create({
+                    publicKey: publicKeyCredentialCreationOptions
+                });
+                
+                // Guardar credencial
+                localStorage.setItem(`biometric_cred_${this.chatId}`, JSON.stringify({
+                    id: credential.id,
+                    rawId: Array.from(new Uint8Array(credential.rawId)),
+                    type: credential.type
+                }));
+                
+                this.onAuthSuccess();
+            }
+            
+            async authenticateWithCredential(options) {
+                this.showStatus('info', 'Verificando identidad biométrica...');
+                
+                const credential = await navigator.credentials.get({
+                    publicKey: options
+                });
+                
+                if (credential) {
+                    this.onAuthSuccess();
+                } else {
+                    throw new Error('Falló la verificación biométrica');
+                }
+            }
+            
+            generateChallenge() {
+                const array = new Uint8Array(32);
+                window.crypto.getRandomValues(array);
+                return array;
+            }
+            
+            onAuthSuccess() {
+                this.authToken = this.generateAuthToken();
+                this.showStatus('success', '¡Autenticación biométrica exitosa!');
+                this.showTelegramReturn();
+                
+                // Opcional: enviar resultado automáticamente al servidor
+                this.sendAuthResult(true);
+            }
+            
+            generateAuthToken() {
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substring(2, 15);
+                return `AUTH_${this.chatId}_${timestamp}_${randomStr}`;
+            }
+            
+            showTelegramReturn() {
+                const telegramReturn = document.getElementById('telegram-return');
+                const authCodeEl = document.getElementById('auth-code');
+                
+                authCodeEl.textContent = this.authToken;
+                telegramReturn.classList.remove('hidden');
+                
+                // Auto-expirar el token en 5 minutos
+                setTimeout(() => {
+                    this.authToken = null;
+                    telegramReturn.innerHTML = '<h3>⏰ Token Expirado</h3><p>Solicita una nueva autenticación</p>';
+                }, 5 * 60 * 1000);
+            }
+            
+            async sendAuthResult(success) {
+                // Aquí puedes enviar el resultado a tu servidor
+                try {
+                    const data = {
+                        chatId: this.chatId,
+                        userId: this.userId,
+                        success: success,
+                        token: this.authToken,
+                        timestamp: new Date().toISOString(),
+                        device: this.deviceInfo
+                    };
+                    
+                    // Ejemplo de envío (ajusta la URL según tu servidor)
+                    // await fetch('/api/biometric-auth', {
+                    //     method: 'POST',
+                    //     headers: { 'Content-Type': 'application/json' },
+                    //     body: JSON.stringify(data)
+                    // });
+                    
+                    console.log('Resultado de autenticación:', data);
+                } catch (error) {
+                    console.error('Error enviando resultado:', error);
+                }
+            }
+            
+            handleAuthError(error) {
+                let message = 'Error en la autenticación biométrica';
+                
+                if (error.name === 'NotAllowedError') {
+                    message = 'Autenticación cancelada o denegada';
+                } else if (error.name === 'NotSupportedError') {
+                    message = 'Autenticación biométrica no soportada';
+                } else if (error.name === 'SecurityError') {
+                    message = 'Error de seguridad. Verifica la conexión HTTPS';
+                } else if (error.name === 'AbortError') {
+                    message = 'Tiempo de espera agotado';
+                }
+                
+                this.showStatus('error', message);
+                document.getElementById('fallback-button').style.display = 'inline-block';
+            }
+            
+            showStatus(type, message) {
+                const statusEl = document.getElementById('status');
+                statusEl.className = `status ${type}`;
+                statusEl.textContent = message;
+                statusEl.classList.remove('hidden');
+            }
+            
+            fallbackAuth() {
+                // Implementar autenticación alternativa (PIN, contraseña, etc.)
+                const pin = prompt('Ingresa tu PIN de seguridad:');
+                if (pin && pin.length >= 4) {
+                    this.authToken = this.generateAuthToken();
+                    this.showStatus('success', 'Autenticación con PIN exitosa');
+                    this.showTelegramReturn();
+                    this.sendAuthResult(true);
+                } else {
+                    this.showStatus('error', 'PIN inválido');
+                }
+            }
+        }
+        
+        // Inicializar cuando se carga la página
+        document.addEventListener('DOMContentLoaded', function() {
+            window.biometricAuth = new BiometricAuth();
+        });
+        
+        // Manejar cuando la página se vuelve visible (usuario regresa de Touch ID/Face ID)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && window.biometricAuth) {
+                // Página visible, usuario podría haber completado autenticación
+                console.log('Página visible - verificando estado de autenticación');
+            }
+        });
+    </script>
+</body>
+</html>
