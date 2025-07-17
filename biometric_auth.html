@@ -173,10 +173,10 @@
         
         <div id="biometric-section">
             <div class="biometric-icon" id="biometric-icon">👆</div>
-            <button class="auth-button" id="auth-button" onclick="authenticateUser()">
+            <button class="auth-button" id="auth-button">
                 Iniciar Autenticación
             </button>
-            <button class="auth-button" id="fallback-button" onclick="fallbackAuth()" style="background: #6c757d; display: none;">
+            <button class="auth-button" id="fallback-button" style="background: #6c757d; display: none;">
                 Usar PIN/Contraseña
             </button>
         </div>
@@ -208,6 +208,32 @@
             init() {
                 this.updateDeviceInfo();
                 this.checkBiometricSupport();
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                const authButton = document.getElementById('auth-button');
+                const fallbackButton = document.getElementById('fallback-button');
+                
+                if (authButton) {
+                    authButton.addEventListener('click', () => {
+                        console.log('🔐 Botón de autenticación presionado');
+                        this.authenticateUser();
+                    });
+                    console.log('✅ Event listener agregado al botón de autenticación');
+                } else {
+                    console.error('❌ No se encontró el botón de autenticación');
+                }
+                
+                if (fallbackButton) {
+                    fallbackButton.addEventListener('click', () => {
+                        console.log('🔑 Botón de fallback presionado');
+                        this.fallbackAuth();
+                    });
+                    console.log('✅ Event listener agregado al botón de fallback');
+                } else {
+                    console.error('❌ No se encontró el botón de fallback');
+                }
             }
             
             getUrlParameter(name) {
@@ -334,7 +360,7 @@
                     challenge: this.generateChallenge(),
                     rp: {
                         name: "ArcoPrime Chatbot",
-                        id: window.location.hostname,
+                        id: "sebacaro.github.io",
                     },
                     user: {
                         id: new TextEncoder().encode(this.chatId || 'user'),
@@ -476,9 +502,62 @@
             }
         }
         
+        // Debug: Verificar que el script se carga
+        console.log('📄 Script de autenticación biométrica cargado');
+        
+        // Funciones globales como fallback (por si acaso)
+        window.authenticateUser = function() {
+            console.log('🔄 Función global authenticateUser llamada');
+            if (window.biometricAuth && window.biometricAuth.authenticateUser) {
+                window.biometricAuth.authenticateUser();
+            } else {
+                console.error('❌ BiometricAuth no disponible');
+                alert('Error: Sistema de autenticación no disponible. Recarga la página.');
+            }
+        };
+        
+        window.fallbackAuth = function() {
+            console.log('🔄 Función global fallbackAuth llamada');
+            if (window.biometricAuth && window.biometricAuth.fallbackAuth) {
+                window.biometricAuth.fallbackAuth();
+            } else {
+                console.error('❌ BiometricAuth no disponible');
+                const pin = prompt('Ingresa tu PIN de seguridad:');
+                if (pin && pin.length >= 4) {
+                    const chatId = new URLSearchParams(window.location.search).get('chatId');
+                    const authToken = `AUTH_${chatId}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+                    document.getElementById('auth-code').textContent = authToken;
+                    document.getElementById('telegram-return').classList.remove('hidden');
+                }
+            }
+        };
+        
         // Inicializar cuando se carga la página
         document.addEventListener('DOMContentLoaded', function() {
-            window.biometricAuth = new BiometricAuth();
+            console.log('🚀 DOM completamente cargado, inicializando BiometricAuth...');
+            
+            try {
+                window.biometricAuth = new BiometricAuth();
+                console.log('✅ BiometricAuth inicializado correctamente');
+                
+                // Debug: Verificar elementos del DOM
+                const authButton = document.getElementById('auth-button');
+                const fallbackButton = document.getElementById('fallback-button');
+                console.log('🔍 Elementos encontrados:', {
+                    authButton: !!authButton,
+                    fallbackButton: !!fallbackButton,
+                    chatId: window.biometricAuth.chatId,
+                    userId: window.biometricAuth.userId
+                });
+                
+            } catch (error) {
+                console.error('❌ Error inicializando BiometricAuth:', error);
+                const statusEl = document.getElementById('status');
+                if (statusEl) {
+                    statusEl.innerHTML = '<div class="status error">Error inicializando autenticación biométrica: ' + error.message + '</div>';
+                    statusEl.classList.remove('hidden');
+                }
+            }
         });
         
         // Manejar cuando la página se vuelve visible (usuario regresa de Touch ID/Face ID)
