@@ -177,7 +177,7 @@
                 Iniciar Autenticación
             </button>
             <button class="auth-button" id="fallback-button" style="background: #6c757d; display: none;">
-                Usar PIN/Contraseña
+                Generar Código Temporal
             </button>
         </div>
         
@@ -247,9 +247,12 @@
                 
                 let device = {
                     os: 'Unknown',
-                    biometricType: 'biométrica',
+                    biometricType: 'autenticación biométrica',
                     isSupported: false
                 };
+                
+                console.log('UserAgent:', userAgent);
+                console.log('Platform:', platform);
                 
                 if (/iPhone|iPad|iPod/.test(userAgent)) {
                     device.os = 'iOS';
@@ -257,18 +260,23 @@
                     device.isSupported = true;
                 } else if (/Android/.test(userAgent)) {
                     device.os = 'Android';
-                    device.biometricType = 'Huella Digital';
+                    device.biometricType = 'Huella Digital / Face Unlock';
                     device.isSupported = true;
-                } else if (/Windows/.test(userAgent)) {
+                } else if (/Windows NT/.test(userAgent)) {
                     device.os = 'Windows';
                     device.biometricType = 'Windows Hello';
                     device.isSupported = true;
-                } else if (/Mac/.test(platform)) {
+                } else if (/Macintosh|Mac OS X/.test(userAgent)) {
                     device.os = 'macOS';
                     device.biometricType = 'Touch ID';
                     device.isSupported = true;
+                } else {
+                    device.os = 'Otro';
+                    device.biometricType = 'autenticación del dispositivo';
+                    device.isSupported = false;
                 }
                 
+                console.log('Dispositivo detectado:', device);
                 return device;
             }
             
@@ -315,28 +323,23 @@
                     loader.classList.remove('hidden');
                     statusEl.classList.add('hidden');
                     
-                    this.showStatus('info', 'Preparando autenticación...');
+                    this.showStatus('info', 'Iniciando autenticación biométrica...');
                     
-                    // Configuración WebAuthn
-                    const publicKeyCredentialRequestOptions = {
-                        challenge: this.generateChallenge(),
-                        allowCredentials: [],
-                        userVerification: 'required',
-                        authenticatorSelection: {
-                            authenticatorAttachment: 'platform',
-                            userVerification: 'required'
-                        },
-                        timeout: 60000
-                    };
-                    
-                    // Si no hay credenciales registradas, crear una nueva
-                    const hasCredentials = await this.checkExistingCredentials();
-                    
-                    if (!hasCredentials) {
-                        await this.registerNewCredential();
-                    } else {
-                        await this.authenticateWithCredential(publicKeyCredentialRequestOptions);
+                    // Verificar soporte de WebAuthn
+                    if (!window.PublicKeyCredential) {
+                        throw new Error('WebAuthn no soportado en este dispositivo');
                     }
+                    
+                    // Verificar disponibilidad de autenticador
+                    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                    if (!available) {
+                        throw new Error('Autenticación biométrica no disponible en este dispositivo');
+                    }
+                    
+                    this.showStatus('info', `Activando ${this.deviceInfo.biometricType}...`);
+                    
+                    // Intentar crear credencial directamente (más compatible)
+                    await this.createBiometricCredential();
                     
                 } catch (error) {
                     console.error('Error de autenticación:', error);
@@ -353,13 +356,13 @@
                 return !!storedCredentials;
             }
             
-            async registerNewCredential() {
-                this.showStatus('info', 'Registrando nueva credencial biométrica...');
+            async createBiometricCredential() {
+                this.showStatus('info', 'Solicitando autenticación biométrica...');
                 
                 const publicKeyCredentialCreationOptions = {
                     challenge: this.generateChallenge(),
                     rp: {
-                        name: "ArcoPrime Chatbot",
+                        name: "ArcoPrime",
                         id: "sebacaro.github.io",
                     },
                     user: {
@@ -367,27 +370,31 @@
                         name: `usuario_${this.chatId}`,
                         displayName: "Usuario ArcoPrime",
                     },
-                    pubKeyCredParams: [{alg: -7, type: "public-key"}],
+                    pubKeyCredParams: [
+                        {alg: -7, type: "public-key"},   // ES256
+                        {alg: -257, type: "public-key"} // RS256
+                    ],
                     authenticatorSelection: {
                         authenticatorAttachment: "platform",
-                        userVerification: "required"
+                        userVerification: "required",
+                        requireResidentKey: false
                     },
-                    timeout: 60000,
-                    attestation: "direct"
+                    timeout: 120000, // 2 minutos
+                    attestation: "none"
                 };
+                
+                console.log('Creando credencial biométrica...', publicKeyCredentialCreationOptions);
                 
                 const credential = await navigator.credentials.create({
                     publicKey: publicKeyCredentialCreationOptions
                 });
                 
-                // Guardar credencial
-                localStorage.setItem(`biometric_cred_${this.chatId}`, JSON.stringify({
-                    id: credential.id,
-                    rawId: Array.from(new Uint8Array(credential.rawId)),
-                    type: credential.type
-                }));
-                
-                this.onAuthSuccess();
+                if (credential) {
+                    console.log('✅ Credencial biométrica creada exitosamente');
+                    this.onAuthSuccess();
+                } else {
+                    throw new Error('No se pudo crear la credencial biométrica');
+                }
             }
             
             async authenticateWithCredential(options) {
@@ -466,19 +473,39 @@
             
             handleAuthError(error) {
                 let message = 'Error en la autenticación biométrica';
+                let showFallback = false;
+                
+                console.error('Error completo:', error);
                 
                 if (error.name === 'NotAllowedError') {
-                    message = 'Autenticación cancelada o denegada';
+                    message = 'Autenticación cancelada por el usuario';
                 } else if (error.name === 'NotSupportedError') {
-                    message = 'Autenticación biométrica no soportada';
+                    message = 'Autenticación biométrica no disponible en este dispositivo';
+                    showFallback = true;
                 } else if (error.name === 'SecurityError') {
-                    message = 'Error de seguridad. Verifica la conexión HTTPS';
+                    message = 'Error de seguridad. La página debe cargarse con HTTPS';
                 } else if (error.name === 'AbortError') {
-                    message = 'Tiempo de espera agotado';
+                    message = 'Tiempo de espera agotado. Intenta nuevamente';
+                } else if (error.message.includes('no disponible')) {
+                    message = error.message;
+                    showFallback = true;
+                } else {
+                    message = `Error: ${error.message || 'Autenticación biométrica falló'}`;
                 }
                 
                 this.showStatus('error', message);
-                document.getElementById('fallback-button').style.display = 'inline-block';
+                
+                // Solo mostrar fallback si realmente no hay biometría disponible
+                if (showFallback) {
+                    document.getElementById('fallback-button').style.display = 'inline-block';
+                }
+                
+                // Agregar botón para reintentar
+                setTimeout(() => {
+                    const authButton = document.getElementById('auth-button');
+                    authButton.disabled = false;
+                    authButton.textContent = 'Reintentar Autenticación';
+                }, 3000);
             }
             
             showStatus(type, message) {
@@ -489,15 +516,30 @@
             }
             
             fallbackAuth() {
-                // Implementar autenticación alternativa (PIN, contraseña, etc.)
-                const pin = prompt('Ingresa tu PIN de seguridad:');
-                if (pin && pin.length >= 4) {
+                // Fallback cuando biometría no está disponible
+                const confirmed = confirm(
+                    '⚠️ La autenticación biométrica no está disponible en tu dispositivo.\n\n' +
+                    '🔐 Se generará un código de autenticación temporal.\n\n' +
+                    '⚠️ IMPORTANTE: Este método es menos seguro que la biometría.\n\n' +
+                    '¿Deseas continuar?'
+                );
+                
+                if (confirmed) {
+                    // Generar código temporal
                     this.authToken = this.generateAuthToken();
-                    this.showStatus('success', 'Autenticación con PIN exitosa');
+                    this.showStatus('success', '⚠️ Código temporal generado (menos seguro que biometría)');
                     this.showTelegramReturn();
                     this.sendAuthResult(true);
+                    
+                    // Agregar advertencia en el resultado
+                    const authCodeEl = document.getElementById('auth-code');
+                    authCodeEl.style.backgroundColor = '#fff3cd';
+                    authCodeEl.style.border = '1px solid #ffeaa7';
+                    
+                    const telegramReturn = document.getElementById('telegram-return');
+                    telegramReturn.innerHTML += '<div style="margin-top: 15px; padding: 10px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; color: #721c24;"><strong>⚠️ Advertencia:</strong> Se usó método alternativo menos seguro</div>';
                 } else {
-                    this.showStatus('error', 'PIN inválido');
+                    this.showStatus('info', 'Autenticación cancelada');
                 }
             }
         }
@@ -522,12 +564,14 @@
                 window.biometricAuth.fallbackAuth();
             } else {
                 console.error('❌ BiometricAuth no disponible');
-                const pin = prompt('Ingresa tu PIN de seguridad:');
-                if (pin && pin.length >= 4) {
+                const confirmed = confirm('⚠️ Biometría no disponible. ¿Generar código temporal?');
+                if (confirmed) {
                     const chatId = new URLSearchParams(window.location.search).get('chatId');
                     const authToken = `AUTH_${chatId}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
                     document.getElementById('auth-code').textContent = authToken;
                     document.getElementById('telegram-return').classList.remove('hidden');
+                    document.getElementById('status').innerHTML = '<div class="status success">⚠️ Código temporal generado</div>';
+                    document.getElementById('status').classList.remove('hidden');
                 }
             }
         };
